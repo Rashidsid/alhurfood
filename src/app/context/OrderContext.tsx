@@ -101,17 +101,32 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       status: order.status,
     };
 
-    const response = await fetch('/api/send-order-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailPayload),
-    });
+    // Determine API endpoint based on environment
+    const apiUrl = import.meta.env.DEV 
+      ? 'http://localhost:3001/api/send-order-email'
+      : '/api/send-order-email';
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to send email notification');
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(emailPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Email API error:', errorData);
+        throw new Error(errorData.error || 'Failed to send email notification');
+      }
+
+      const result = await response.json();
+      console.log('✅ Email sent successfully:', result);
+    } catch (error) {
+      console.error('Email notification error:', error);
+      // Log but don't throw - order was already created
+      throw error;
     }
   };
 

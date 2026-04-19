@@ -64,14 +64,54 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
       if (insertError) throw insertError;
       if (data && data[0]) {
+        const orderId = data[0].id;
         setOrders([data[0], ...orders]);
-        return data[0].id;
+
+        // Send email notification to admin
+        try {
+          await sendOrderEmailNotification(orderId, order);
+        } catch (emailError) {
+          console.error('Failed to send email notification:', emailError);
+          // Don't throw - order was created successfully even if email fails
+        }
+
+        return orderId;
       }
       throw new Error('No order data returned');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create order';
       setError(errorMessage);
       throw err;
+    }
+  };
+
+  const sendOrderEmailNotification = async (
+    orderId: string,
+    order: Omit<Order, 'id' | 'createdAt'>
+  ): Promise<void> => {
+    const emailPayload = {
+      orderId,
+      customerInfo: order.customerInfo,
+      items: order.items,
+      total: order.total,
+      subtotal: order.subtotal,
+      discount: order.discount,
+      deliveryCharges: order.deliveryCharges || 0,
+      promoCode: order.promoCode,
+      status: order.status,
+    };
+
+    const response = await fetch('/api/send-order-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailPayload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to send email notification');
     }
   };
 
